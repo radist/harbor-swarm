@@ -1,0 +1,75 @@
+image: docker
+
+stages:
+  - deploy
+  - cleanup
+
+variables:
+    DOCKER_DRIVER: overlay2
+    GIT_SUBMODULE_STRATEGY: recursive
+    CI_SOURCE_IMAGE_WITH_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    GITLAB_NAMESPACE: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    REVIEW_HOST: "mm.${DOMAIN}"
+
+.swarm_variables: &swarm_variables
+    DOCKER_HOST: tcp://$MANAGER_HOST:2376
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "/certs"
+
+.setup:
+  variables:
+    <<: *swarm_variables
+  before_script:
+    - mkdir -p $DOCKER_CERT_PATH
+    - echo "$TLSCACERT" > $DOCKER_CERT_PATH/ca.pem
+    - echo "$TLSCERT" > $DOCKER_CERT_PATH/cert.pem
+    - echo "$TLSKEY" > $DOCKER_CERT_PATH/key.pem
+    - echo -n $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
+  after_script:
+    - rm -rf $DOCKER_CERT_PATH
+  tags: [docker]
+
+
+deploy:
+  extends: .setup
+  stage: deploy
+  image:
+    name: git.rubium.ru:4567/rubium/docker-sdp:latest
+    entrypoint: [""]
+  script:
+    - |
+      cat > secret_values.yaml << EOF
+      postgres_password: "${POSTGRES_PASSWORD}"
+      mattermost_base_domain: "${REVIEW_HOST}"
+      gitlab_namespace: "${GITLAB_NAMESPACE}"
+      EOF
+    - echo "exec nothelm run deploy --project-dir ./chart -f secret_values.yaml" -f ./chart/values.yaml > setup.sh
+#    - docker stack deploy -c docker-compose.swarm.yml mattermost --with-registry-auth --resolve-image=always --prune
+    - bash setup.sh
+    
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    url:  https://${REVIEW_HOST}
+    on_stop: stop
+  when: manual
+  only:
+    - master
+  tags:
+    - docker
+
+
+stop:
+  extends: .setup
+  stage: cleanup
+  dependencies:
+    - deploy
+  script:
+    - docker stack rm mattermost
+  when: manual
+  environment:
+      name: review/$CI_COMMIT_REF_NAME
+      action: stop
+  only:
+    - master
+  tags:
+  - docker

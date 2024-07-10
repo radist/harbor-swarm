@@ -1,0 +1,5 @@
+# mattermost_base_domain:
+stack_name: harbor
+
+# удалять сервисы, которые больше не участвуют
+prune_services: false
