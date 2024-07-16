@@ -39,8 +39,8 @@ deploy:
   script:
     - |
       cat > secret_values.yaml << EOF
-      postgres_password: "${POSTGRES_PASSWORD}"
-      mattermost_base_domain: "${REVIEW_HOST}"
+      registry_http_secret: ""
+      core_secret: "${REVIEW_HOST}"
       gitlab_namespace: "${GITLAB_NAMESPACE}"
       EOF
     - echo "exec nothelm run deploy --project-dir ./chart -f secret_values.yaml" -f ./chart/values.yaml > setup.sh
