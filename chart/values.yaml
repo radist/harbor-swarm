@@ -3,3 +3,21 @@ stack_name: harbor
 
 # удалять сервисы, которые больше не участвуют
 prune_services: false
+
+core_secret: "bjJEeEFtbGVmQTJuTmJJaA=="
+jobservice_secret: "VldhTGJLY0gxV05PUnNIaw=="
+registry_http_secret: "dFFoeEZtRVY4Mlg2cDlqMw=="
+
+registry_credential_username: "harbor_registry_user"
+# openssl passwd -apr1 | sed -E "s:[\$]:\$\$:g" 
+# escaping $
+# https://blog.roberthallam.org/2020/05/generating-a-traefik-nginx-password-hash-without-htpasswd/
+registry_credential_password: "$$apr1$$tAsi2FeE$$26St/1UyYj.zDnUBizHBk1"
+#harbor_registry_user:$2y$10$9L4Tc0DJbFFMB6RdSCunrOpTHdwhid4ktBJmLD00bYgqkkGOvll3m
+#
+postgresql_username: postgres
+postgresql_database: registry
+postgresql_password:
+postgresql_sslmode: disable
+
+harbor_admin_password: bitnami

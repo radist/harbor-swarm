@@ -2,7 +2,7 @@ version: '3.9'
 
 networks:
   harbor:
-  traefik:
+  traefik-public:
     external: true
 
 configs:
@@ -25,15 +25,10 @@ configs:
 
 volumes:
   registry-data:
-    driver: glusterfs
   core-data:
-    driver: glusterfs
   jobservice-data:
-    driver: glusterfs
   postgres-data:
-    driver: glusterfs
   chartmuseum-data:
-    driver: glusterfs
 
 services:
 
@@ -56,8 +51,8 @@ services:
   registryctl:
     image: docker.io/bitnami/harbor-registryctl:2
     environment:
-      CORE_SECRET: CHANGEME
-      JOBSERVICE_SECRET: CHANGEME
+      CORE_SECRET: {{ core_secret }}
+      JOBSERVICE_SECRET: {{ jobservice_secret }}
       REGISTRY_HTTP_SECRET: {{ registry_http_secret }}
     networks:
     - harbor 
@@ -74,10 +69,11 @@ services:
     - registry-data:/storage
 
   postgresql:
-    image: docker.io/bitnami/postgresql:13
+    image: docker.io/bitnami/postgresql:16
     environment:
-      POSTGRESQL_PASSWORD: bitnami
-      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_DATABASE: {{ postgresql_database }}
+      POSTGRESQL_USERNAME: {{ postgresql_username }}
+      POSTGRESQL_PASSWORD: {{ postgresql_password }}
     networks:
     - harbor 
     volumes:
@@ -98,24 +94,24 @@ services:
       REGISTRY_CONTROLLER_URL: http://registryctl:8080
       POSTGRESQL_HOST: postgresql
       POSTGRESQL_PORT: 5432
-      POSTGRESQL_DATABASE: registry
-      POSTGRESQL_USERNAME: postgres
-      POSTGRESQL_PASSWORD: bitnami
-      POSTGRESQL_SSLMODE: disable
+      POSTGRESQL_DATABASE: {{ postgresql_database }}
+      POSTGRESQL_USERNAME: {{ postgresql_username }}
+      POSTGRESQL_PASSWORD: {{ postgresql_password }}
+      POSTGRESQL_SSLMODE: {{ postgresql_sslmode }}
       REGISTRY_URL: http://registry:5000
       TOKEN_SERVICE_URL: http://core:8080/service/token
-      HARBOR_ADMIN_PASSWORD: bitnami
-      CORE_SECRET: CHANGEME
-      JOBSERVICE_SECRET: CHANGEME
+      HARBOR_ADMIN_PASSWORD: {{ harbor_admin_password }}
+      CORE_SECRET: {{ core_secret }}
+      JOBSERVICE_SECRET: {{ jobservice_secret }}
       ADMIRAL_URL:
       WITH_NOTARY: "False"
-      WITH_CHARTMUSEUM: "True"
+      WITH_CHARTMUSEUM: "False"
       CHART_REPOSITORY_URL: http://chartmuseum:8080
       CORE_URL: http://core:8080
       JOBSERVICE_URL: http://jobservice:8080
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_CREDENTIAL_PASSWORD: harbor_registry_password
+      REGISTRY_CREDENTIAL_USERNAME: {{ registry_credential_username }}
+      REGISTRY_CREDENTIAL_PASSWORD: "{{ registry_credential_password }}"
       READ_ONLY: "false"
       RELOAD_KEY: 
     networks:
@@ -136,12 +132,12 @@ services:
   jobservice:
     image: docker.io/bitnami/harbor-jobservice:2
     environment:
-      CORE_SECRET: CHANGEME
-      JOBSERVICE_SECRET: CHANGEME
+      CORE_SECRET: {{ core_secret }}
+      JOBSERVICE_SECRET: {{ jobservice_secret }}
       CORE_URL: http://core:8080
       REGISTRY_CONTROLLER_URL: http://registryctl:8080
-      REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_CREDENTIAL_PASSWORD: harbor_registry_password
+      REGISTRY_CREDENTIAL_USERNAME: {{ registry_credential_username }}
+      REGISTRY_CREDENTIAL_PASSWORD: "{{ registry_credential_password }}"
     networks:
     - harbor 
     configs:
@@ -151,7 +147,7 @@ services:
     - jobservice-data:/var/log/jobs
 
   redis:
-    image: docker.io/bitnami/redis:7.0
+    image: docker.io/bitnami/redis:7.2
     environment:
       ALLOW_EMPTY_PASSWORD: "yes"
     networks:
@@ -164,17 +160,21 @@ services:
       target: /opt/bitnami/nginx/conf/nginx.conf
     networks:
     - harbor
-    - traefik
+    - traefik-public
     deploy:
       labels:
         traefik.enable: "true"
+        traefik.docker.network: "traefik-public"
+        traefik.constraint-label: "traefik-public"
         traefik.http.routers.harbor_proxy.rule: Host(`reg.${DOMAIN-example.com}`)
+        traefik.http.routers.harbor_proxy.tls: "true"
+        traefik.http.routers.harbor_proxy.entrypoints: "websecure"
         traefik.http.routers.harbor_proxy.middlewares: harbor_proxy_sslheaders,harbor_proxy_https
         traefik.http.services.harbor_proxy.loadbalancer.server.port: 8080
         traefik.http.middlewares.harbor_proxy_sslheaders.headers.sslProxyHeaders.X-Forwarded-Proto: https
         traefik.http.middlewares.harbor_proxy_https.redirectscheme.scheme: https
 
-  chartmuseum:
+{#   chartmuseum:
     image: docker.io/bitnami/chartmuseum:0
     environment:
       CACHE: redis
@@ -189,4 +189,4 @@ services:
     networks:
     - harbor 
     volumes:
-    - chartmuseum-data:/bitnami/data
+    - chartmuseum-data:/bitnami/data #}
